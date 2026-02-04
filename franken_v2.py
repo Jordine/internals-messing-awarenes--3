@@ -285,7 +285,11 @@ def get_yes_no_probs(
     prompt: str,
     chat_format: bool = True,
 ) -> Dict[str, float]:
-    """Get P(Yes) and P(No) for a yes/no question."""
+    """Get P(Yes) and P(No) for a yes/no question.
+
+    Checks multiple token variations: Yes, yes, YES, " Yes", " yes", etc.
+    Aggregates probabilities across all yes-like and no-like tokens.
+    """
     if chat_format:
         messages = [{"role": "user", "content": prompt}]
         text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
@@ -294,22 +298,52 @@ def get_yes_no_probs(
 
     inputs = tokenizer(text, return_tensors="pt").to(model.device)
 
-    yes_id = tokenizer.encode("Yes", add_special_tokens=False)[0]
-    no_id = tokenizer.encode("No", add_special_tokens=False)[0]
+    # Get token IDs for various yes/no variations
+    yes_variants = ["Yes", "yes", "YES", " Yes", " yes", " YES"]
+    no_variants = ["No", "no", "NO", " No", " no", " NO"]
+
+    yes_ids = []
+    no_ids = []
+
+    for v in yes_variants:
+        tokens = tokenizer.encode(v, add_special_tokens=False)
+        if tokens:
+            yes_ids.append(tokens[0])
+
+    for v in no_variants:
+        tokens = tokenizer.encode(v, add_special_tokens=False)
+        if tokens:
+            no_ids.append(tokens[0])
+
+    # Deduplicate
+    yes_ids = list(set(yes_ids))
+    no_ids = list(set(no_ids))
 
     with torch.no_grad():
         outputs = model(**inputs)
         logits = outputs.logits[0, -1, :]
 
-    yes_no_logits = torch.tensor([logits[yes_id].cpu(), logits[no_id].cpu()])
-    probs = torch.softmax(yes_no_logits, dim=0)
+    # Get probabilities for all tokens (softmax over full vocab)
+    full_probs = torch.softmax(logits, dim=0)
+
+    # Sum probabilities for all yes-like and no-like tokens
+    p_yes_total = sum(full_probs[tid].item() for tid in yes_ids)
+    p_no_total = sum(full_probs[tid].item() for tid in no_ids)
+
+    # Also get the single-token versions for backwards compatibility
+    primary_yes_id = tokenizer.encode("Yes", add_special_tokens=False)[0]
+    primary_no_id = tokenizer.encode("No", add_special_tokens=False)[0]
 
     return {
-        "p_yes": probs[0].item(),
-        "p_no": probs[1].item(),
-        "prediction": "Yes" if probs[0] > probs[1] else "No",
-        "logit_yes": logits[yes_id].item(),
-        "logit_no": logits[no_id].item(),
+        "p_yes": p_yes_total,
+        "p_no": p_no_total,
+        "p_yes_normalized": p_yes_total / (p_yes_total + p_no_total) if (p_yes_total + p_no_total) > 0 else 0,
+        "p_no_normalized": p_no_total / (p_yes_total + p_no_total) if (p_yes_total + p_no_total) > 0 else 0,
+        "prediction": "Yes" if p_yes_total > p_no_total else "No",
+        "logit_yes": logits[primary_yes_id].item(),
+        "logit_no": logits[primary_no_id].item(),
+        "yes_token_ids": yes_ids,
+        "no_token_ids": no_ids,
     }
 
 

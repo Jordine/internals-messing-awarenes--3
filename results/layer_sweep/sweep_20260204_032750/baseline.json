@@ -1,0 +1,8 @@
+{
+  "p_yes": 2.2118911147117615e-08,
+  "p_no": 1.0,
+  "logit_yes": 20.875,
+  "logit_no": 38.5,
+  "perplexity": 3.508979320526123,
+  "type": "baseline"
+}
