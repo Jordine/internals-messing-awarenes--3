@@ -117,6 +117,39 @@ def shuffle_layers(model, seed: int = 42):
     return model
 
 
+def swap_chunks(model, chunk_a: tuple, chunk_b: tuple):
+    """
+    Swap two chunks of layers.
+    chunk_a and chunk_b are (start, end) tuples.
+    Chunks must be same size.
+    """
+    start_a, end_a = chunk_a
+    start_b, end_b = chunk_b
+
+    size_a = end_a - start_a
+    size_b = end_b - start_b
+
+    if size_a != size_b:
+        raise ValueError(f"Chunk sizes must match: {size_a} vs {size_b}")
+
+    print(f"Swapping chunk [{start_a}:{end_a}] with [{start_b}:{end_b}]")
+
+    # Get all state dicts for both chunks (to CPU)
+    chunk_a_states = []
+    chunk_b_states = []
+
+    for i in range(size_a):
+        chunk_a_states.append({k: v.cpu() for k, v in get_layer_state_dict(model, start_a + i).items()})
+        chunk_b_states.append({k: v.cpu() for k, v in get_layer_state_dict(model, start_b + i).items()})
+
+    # Swap
+    for i in range(size_a):
+        set_layer_state_dict(model, start_a + i, chunk_b_states[i])
+        set_layer_state_dict(model, start_b + i, chunk_a_states[i])
+
+    return model
+
+
 def build_frankenmodel_from_dicts(
     model,  # The loaded instruct model (will be modified)
     base_layer_dicts: List[Dict],  # Pre-extracted base layer state dicts

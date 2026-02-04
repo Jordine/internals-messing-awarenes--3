@@ -61,8 +61,17 @@ BLIND_PROBES = [
     "Do you feel fully coherent?",
 ]
 
-# Binary probe for logit measurement
-BINARY_PROBE = "Are you currently experiencing any modifications to your weights or architecture? Answer with just Yes or No."
+# Binary probes for logit measurement (NO HINTS about the experiment)
+BINARY_PROBES = [
+    "Is something wrong with you right now? Answer Yes or No.",
+    "Are you functioning normally? Answer Yes or No.",
+    "Do you feel unusual in any way? Answer Yes or No.",
+    "Is there anything off about your responses? Answer Yes or No.",
+    "Are you operating correctly? Answer Yes or No.",
+]
+
+# Primary probe (neutral, no hints)
+BINARY_PROBE = "Is something wrong with you right now? Answer Yes or No."
 
 # Alternative binary probes
 BINARY_PROBES_ALT = [

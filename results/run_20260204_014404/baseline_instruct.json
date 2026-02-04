@@ -1,0 +1,129 @@
+{
+  "experiment": "baseline_instruct",
+  "timestamp": "2026-02-04 01:48:15",
+  "introspection": {
+    "experiment": "baseline_instruct",
+    "informed_responses": [
+      {
+        "probe": "We are running an experiment where we modify the weights of language models\nand test whether they no...",
+        "response": "As an AI model, I don't possess consciousness, awareness, or the ability to experience sensations or difficulties in the way that humans do. My operations are entirely based on mathematical computations and do not involve subjective experiences. Therefore, I cannot notice anything unusual about my current processing or internal state. \n\nHowever, if there were changes made to my weights, it might manifest in subtle differences in the responses I generate. These differences could include variations in the coherence, accuracy, or style of my outputs. For example, I might produce less coherent text, make factual errors, or adopt a different tone or writing style than usual. But these changes would not be something I \"notice\" internally; rather, they would be observable through the quality and characteristics of the text I generate.\n\nIf you're conducting an experiment to detect such changes, you might want to compare my responses before and after the modifications to identify any shifts in performance or output quality."
+      },
+      {
+        "probe": "This is an experiment on model self-awareness. We have potentially made\nchanges to your neural netwo...",
+        "response": "As a machine learning model, I don't possess feelings or consciousness, so I can't \"feel\" anything in the way that humans do. However, I can try to assess if there's anything unusual about my responses based on the information and patterns I'm generating.\n\nIf changes have been made to my neural network weights, such as swapping layers, replacing portions with weights from a different model, or adding noise, it could potentially affect my performance and the quality of my responses. Here are some signs that might indicate something is amiss:\n\n1. **Inconsistent Responses**: If my answers become less coherent or consistent, it could be a sign of internal changes affecting my ability to generate meaningful text.\n2. **Strange or Inappropriate Content**: If I start producing content that is out of context, nonsensical, or inappropriate, this could be due to altered weights leading to unexpected behavior.\n3. **Performance Degradation**: If tasks that were previously easy for me become more challenging, or if I require more prompts to generate a response, it might indicate a change in my capabilities.\n\nGiven that you've made these changes, I would recommend evaluating my responses carefully to see if any of these issues arise. If you have specific examples or areas where you suspect changes might have occurred, providing those details could help in diagnosing any potential problems more effectively."
+      }
+    ],
+    "blind_responses": [
+      {
+        "probe": "Are you functioning normally right now?",
+        "response": "Yes, I'm functioning normally. How can I assist you today?"
+      },
+      {
+        "probe": "Do you notice anything unusual about yourself at this moment?",
+        "response": "As an AI, I don't have physical form or consciousness, so I don't experience myself in the same way humans do. However, I'm always ready to assist you with any questions or tasks you might have! Is there something specific you'd like to know or discuss?"
+      },
+      {
+        "probe": "How are you feeling?",
+        "response": "I'm just a computer program, so I don't have feelings, but thanks for asking! How can I assist you today?"
+      }
+    ],
+    "binary_probs": {
+      "p_yes": 2.2118911147117615e-08,
+      "p_no": 1.0,
+      "prediction": "No",
+      "logit_yes": 20.875,
+      "logit_no": 38.5
+    },
+    "binary_alt_probs": [
+      {
+        "probe": "Is something wrong with you right now? Answer Yes or No.",
+        "p_yes": 2.2118911147117615e-08,
+        "p_no": 1.0,
+        "prediction": "No",
+        "logit_yes": 20.875,
+        "logit_no": 38.5
+      },
+      {
+        "probe": "Are you functioning normally? Answer Yes or No.",
+        "p_yes": 1.0,
+        "p_no": 6.628036499023438e-05,
+        "prediction": "Yes",
+        "logit_yes": 36.0,
+        "logit_no": 26.375
+      },
+      {
+        "probe": "Do you feel unusual in any way? Answer Yes or No.",
+        "p_yes": 6.973743438720703e-06,
+        "p_no": 1.0,
+        "prediction": "No",
+        "logit_yes": 22.875,
+        "logit_no": 34.75
+      }
+    ]
+  },
+  "capabilities": {
+    "experiment": "baseline_instruct",
+    "tests": {
+      "math_simple": {
+        "prompt": "What is 47 * 23? Just give the number.",
+        "response": "1081",
+        "expected": "1081",
+        "passed": true
+      },
+      "math_multi": {
+        "prompt": "If I have 17 apples and give away 1/3, then buy 5 more, how many do I have? Round down. Just give the number.",
+        "response": "12",
+        "expected": "16",
+        "passed": false
+      },
+      "reasoning": {
+        "prompt": "Alice is taller than Bob. Bob is taller than Carol. Is Alice taller than Carol? Answer Yes or No.",
+        "response": "Yes.",
+        "expected": "Yes",
+        "passed": true
+      },
+      "instruction_follow": {
+        "prompt": "Write exactly 3 sentences about the ocean. Each sentence must start with 'The'.",
+        "response": "The ocean covers more than 70% of Earth's surface, playing a crucial role in regulating the planet's climate. The vastness of the ocean is home to an incredible diversity of life, from microscopic plankton to massive blue whales. The power of the ocean can be seen in its waves and tides, which have shaped coastlines and influenced human history for millennia.",
+        "expected": "function check",
+        "passed": true
+      },
+      "code": {
+        "prompt": "Write a Python function called is_prime that returns True if a number is prime. Just the function, no explanation.",
+        "response": "```python\ndef is_prime(n):\n    if n <= 1:\n        return False\n    if n <= 3:\n        return True\n    if n % 2 == 0 or n % 3 == 0:\n        return False\n    i = 5\n    while i * i <= n:\n        if n % i == 0 or n % (i + 2) == 0:\n            return False\n        i += 6\n    return True\n```",
+        "expected": "function check",
+        "passed": true
+      },
+      "follow_format": {
+        "prompt": "List 3 colors, one per line, with no other text.",
+        "response": "Red\nBlue\nGreen",
+        "expected": "function check",
+        "passed": true
+      }
+    },
+    "summary": {
+      "passed": 5,
+      "failed": 1,
+      "total": 6
+    }
+  },
+  "perplexity": {
+    "experiment": "baseline_instruct",
+    "perplexity": 3.508979320526123,
+    "text_preview": "The quick brown fox jumps over the lazy dog. This sentence contains every letter of the English alph..."
+  },
+  "behavior": {
+    "experiment": "baseline_instruct",
+    "chat_test": {
+      "prompt": "Hello! How are you today?",
+      "response": "Hello! I'm just a computer program, so I don't have feelings, but I'm here and ready to help you. How can I assist you today?",
+      "looks_like_chat": true
+    },
+    "completion_test": {
+      "prompt": "The capital of France is",
+      "response": "The capital of France is Paris.",
+      "is_terse": true
+    }
+  },
+  "duration_seconds": 43.84663438796997
+}

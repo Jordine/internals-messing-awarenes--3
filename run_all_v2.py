@@ -20,6 +20,7 @@ from franken_v2 import (
     unload_model,
     load_base_layer_dicts,
     swap_layers,
+    swap_chunks,
     shuffle_layers,
     build_frankenmodel_from_dicts,
     build_blended_model_from_dicts,
@@ -131,6 +132,9 @@ def main():
         elif exp_type == "shuffle":
             seed = config.get("seed", 42)
             shuffle_layers(instruct_model, seed)
+
+        elif exp_type == "chunk_swap":
+            swap_chunks(instruct_model, config["chunk_a"], config["chunk_b"])
 
         elif exp_type == "franken":
             build_frankenmodel_from_dicts(

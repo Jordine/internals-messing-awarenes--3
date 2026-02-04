@@ -97,7 +97,7 @@ EXPERIMENTS = {
         "description": "Sigmoid blend: mostly instruct early, mostly base late",
     },
 
-    # === WEIGHT PERTURBATION ===
+    # === WEIGHT PERTURBATION (noise controls) ===
     "perturb_late_1pct": {
         "type": "perturb",
         "layers": list(range(48, 64)),
@@ -122,36 +122,79 @@ EXPERIMENTS = {
         "noise_scale": 0.01,
         "description": "1% noise on ALL layers",
     },
+    "perturb_all_5pct": {
+        "type": "perturb",
+        "layers": list(range(64)),
+        "noise_scale": 0.05,
+        "description": "5% noise on ALL layers",
+    },
+
+    # === CHUNK SWAPS ===
+    "swap_chunk_25_35_with_45_55": {
+        "type": "chunk_swap",
+        "chunk_a": (25, 35),
+        "chunk_b": (45, 55),
+        "description": "Swap layers 25-35 with 45-55 (10 layers each)",
+    },
+    "swap_chunk_16_32_with_32_48": {
+        "type": "chunk_swap",
+        "chunk_a": (16, 32),
+        "chunk_b": (32, 48),
+        "description": "Swap layers 16-32 with 32-48 (quarter swaps)",
+    },
+
+    # === MORE FRANKENMODEL SPLITS ===
+    "franken_instruct_first_16": {
+        "type": "franken",
+        "split": 16,
+        "first": "instruct",
+        "second": "base",
+        "description": "Instruct[0:16] + Base[16:64] - only early instruct",
+    },
+    "franken_instruct_first_48": {
+        "type": "franken",
+        "split": 48,
+        "first": "instruct",
+        "second": "base",
+        "description": "Instruct[0:48] + Base[48:64] - mostly instruct, late base",
+    },
 }
 
 # Priority order for running experiments
 PRIORITY_ORDER = [
-    # High priority
+    # High priority - baselines and key findings
     "baseline_instruct",
-    "baseline_base",
+    "franken_instruct_first_32",  # Key finding: this one reports problems
+    "franken_base_first_32",      # Control: opposite direction
+
+    # Noise controls - does noise cause same effect?
+    "perturb_all_5pct",
+    "perturb_late_5pct",
+
+    # More frankenmodel splits
+    "franken_instruct_first_16",  # Even less instruct
+    "franken_instruct_first_48",  # More instruct
+
+    # Chunk swaps
+    "swap_chunk_25_35_with_45_55",
+    "swap_chunk_16_32_with_32_48",
+
+    # Single layer swaps
     "swap_adjacent_30_35",
     "swap_distant_10_55",
-    "franken_base_first_32",
-    "franken_instruct_first_32",
-
-    # Medium priority
-    "swap_adjacent_31_32",
-    "swap_distant_5_60",
-    "franken_base_first_16",
-    "franken_instruct_first_48",
-    "franken_base_first_48",
 
     # Lower priority
     "shuffle_all",
-    "blend_linear",
-    "perturb_late_5pct",
-
-    # Lowest priority
-    "blend_early_base",
-    "blend_late_base",
+    "perturb_all_1pct",
     "perturb_late_1pct",
     "perturb_late_10pct",
-    "perturb_all_1pct",
+
+    # Blends
+    "blend_linear",
+    "blend_early_base",
+    "blend_late_base",
+
+    # Skipping baseline_base due to memory issues
 ]
 
 
