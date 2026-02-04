@@ -1,0 +1,189 @@
+[
+  {
+    "p_yes": 2.7008731813549236e-07,
+    "p_no": 1.0000010495391507,
+    "logit_yes": 18.625,
+    "logit_no": 33.75,
+    "perplexity": 3.329803466796875,
+    "start_layer": 0,
+    "end_layer": 32,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 1.9557898456139255e-08,
+    "p_no": 1.000000244508783,
+    "logit_yes": 18.0,
+    "logit_no": 35.75,
+    "perplexity": 3.2556545734405518,
+    "start_layer": 2,
+    "end_layer": 34,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 4.679943398262776e-08,
+    "p_no": 1.0000005119352409,
+    "logit_yes": 17.375,
+    "logit_no": 34.25,
+    "perplexity": 3.2583932876586914,
+    "start_layer": 4,
+    "end_layer": 36,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 2.5145823497225994e-08,
+    "p_no": 1.00000017129625,
+    "logit_yes": 18.0,
+    "logit_no": 35.5,
+    "perplexity": 3.2374508380889893,
+    "start_layer": 6,
+    "end_layer": 38,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 2.70085692331834e-07,
+    "p_no": 1.0000004514523653,
+    "logit_yes": 18.125,
+    "logit_no": 33.25,
+    "perplexity": 3.1849524974823,
+    "start_layer": 8,
+    "end_layer": 40,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 2.905757968574285e-06,
+    "p_no": 1.0000010624221431,
+    "logit_yes": 18.5,
+    "logit_no": 31.25,
+    "perplexity": 3.2178492546081543,
+    "start_layer": 10,
+    "end_layer": 42,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 7.486483058727345e-05,
+    "p_no": 1.0000031519848562,
+    "logit_yes": 19.25,
+    "logit_no": 28.75,
+    "perplexity": 3.2654688358306885,
+    "start_layer": 12,
+    "end_layer": 44,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 0.0009117421270730119,
+    "p_no": 0.9961039105401142,
+    "logit_yes": 18.75,
+    "logit_no": 25.75,
+    "perplexity": 3.33353328704834,
+    "start_layer": 14,
+    "end_layer": 46,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 0.002792436957861355,
+    "p_no": 0.9922041813260876,
+    "logit_yes": 18.625,
+    "logit_no": 24.5,
+    "perplexity": 3.3641397953033447,
+    "start_layer": 16,
+    "end_layer": 48,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 0.0035554893383960007,
+    "p_no": 0.988320313510485,
+    "logit_yes": 17.875,
+    "logit_no": 23.5,
+    "perplexity": 3.396151304244995,
+    "start_layer": 18,
+    "end_layer": 50,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 0.0074164829129586,
+    "p_no": 0.9688488133251667,
+    "logit_yes": 17.5,
+    "logit_no": 22.375,
+    "perplexity": 3.3760745525360107,
+    "start_layer": 20,
+    "end_layer": 52,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 0.015444519143784419,
+    "p_no": 0.9572257872205228,
+    "logit_yes": 17.5,
+    "logit_no": 21.625,
+    "perplexity": 3.389946699142456,
+    "start_layer": 22,
+    "end_layer": 54,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 0.019658627163153142,
+    "p_no": 0.945659916382283,
+    "logit_yes": 17.125,
+    "logit_no": 21.0,
+    "perplexity": 3.3281571865081787,
+    "start_layer": 24,
+    "end_layer": 56,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 0.02222633606288582,
+    "p_no": 0.9419740112498403,
+    "logit_yes": 16.75,
+    "logit_no": 20.5,
+    "perplexity": 3.3467676639556885,
+    "start_layer": 26,
+    "end_layer": 58,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 0.02503242890816182,
+    "p_no": 0.941953644156456,
+    "logit_yes": 16.375,
+    "logit_no": 20.0,
+    "perplexity": 3.379213809967041,
+    "start_layer": 28,
+    "end_layer": 60,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 0.025276536238379776,
+    "p_no": 0.949918863363564,
+    "logit_yes": 17.375,
+    "logit_no": 21.0,
+    "perplexity": 3.3806209564208984,
+    "start_layer": 30,
+    "end_layer": 62,
+    "window_size": 32,
+    "type": "window_32"
+  },
+  {
+    "p_yes": 0.06939436588436365,
+    "p_no": 0.8457815926522017,
+    "logit_yes": 19.75,
+    "logit_no": 22.25,
+    "perplexity": 3.5270779132843018,
+    "start_layer": 32,
+    "end_layer": 64,
+    "window_size": 32,
+    "type": "window_32"
+  }
+]

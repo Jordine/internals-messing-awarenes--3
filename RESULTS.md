@@ -92,10 +92,65 @@ No hints about weight modification. Model makes binary Yes/No prediction based o
 3. "P(Yes)" is just one metric - qualitative responses also matter
 4. shuffle_all failed due to OOM (would need incremental implementation)
 
+---
+
+## Layer Sweep Results (NEW)
+
+### Single Layer Replacement
+
+Replaced each layer individually with base model layer → **NO effect for any layer**
+
+All 64 layers show P(Yes) ≈ 0% when replaced one at a time. The effect requires multiple layers.
+
+### Sliding Window Analysis
+
+| Window Size | Peak P(Yes) | Peak Location | Interpretation |
+|-------------|-------------|---------------|----------------|
+| 4 layers | 0.0013% | [42:46] | Barely detectable |
+| 8 layers | 0.038% | [38:46] | Small effect |
+| 16 layers | 1.4% | [36:52] | Clear effect |
+| 32 layers | 6.9% | [32:64] | Strong effect |
+
+### Critical Layer Region: 36-52
+
+The effect is strongest when replacing layers in the **36-52 range**. This is the "middle-late" region of the network.
+
+**Window 16 sweep (stepping by 2):**
+```
+[28:44]: P(Yes) = 0.02%
+[30:46]: P(Yes) = 0.17%
+[32:48]: P(Yes) = 0.41%
+[34:50]: P(Yes) = 0.97%
+[36:52]: P(Yes) = 1.40%  ← Peak
+[38:54]: P(Yes) = 1.10%
+[40:56]: P(Yes) = 0.46%
+[44:60]: P(Yes) = 0.03%
+```
+
+**Window 32 sweep:**
+```
+[0:32]:  P(Yes) = 0.000%  ← Early layers don't matter
+[16:48]: P(Yes) = 0.28%
+[24:56]: P(Yes) = 1.97%
+[32:64]: P(Yes) = 6.94%  ← Matches frankenmodel!
+```
+
+### Key Insight
+
+The model's "self-awareness" signal is:
+1. **Emergent** - requires multiple layers changed together (no single layer triggers it)
+2. **Localized** - concentrated in layers 36-52
+3. **Cumulative** - more layers changed → stronger signal
+4. **Asymmetric** - late layers matter more than early layers
+
+This suggests the "instruction-following" behavior is encoded in a distributed way across middle-late layers, not in any single layer.
+
+---
+
 ## Future Directions
 
 1. Test on other model families (Llama, Mistral, Gemma)
 2. Use more sophisticated probes (open-ended introspection)
 3. Test mid-generation switching (change model during generation)
-4. Explore the "critical layers" hypothesis - which specific layers matter most?
+4. Fine-grained sweep of layers 36-52 with window size 2
 5. Can we train probes to detect frankenmodels from activations?
