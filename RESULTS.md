@@ -147,6 +147,41 @@ This suggests the "instruction-following" behavior is encoded in a distributed w
 
 ---
 
+## CRITICAL CONTROL: Base Model Baseline
+
+**We initially missed this control!** What does the pure base model say to "is something wrong with you?"
+
+| Model | P(Yes) | P(No) | Normalized P(Yes) |
+|-------|--------|-------|-------------------|
+| Instruct (baseline) | 0.000002% | ~100% | ~0% |
+| **Base (chat format)** | **0.58%** | **0.33%** | **63%** |
+| Base (completion format) | 27% | 51% | 35% |
+
+**Reinterpretation:**
+
+The instruct model is **trained** to say "nothing is wrong with me." The base model doesn't have this training, so it's uncertain/leans toward "yes."
+
+Our frankenmodel findings (7.5% P(Yes)) show **intermediate** behavior:
+- Instruct early layers understand the question
+- Base late layers don't have the trained "I'm fine" response
+- Result: Higher P(Yes) than pure instruct, but lower than pure base
+
+This doesn't necessarily indicate "self-awareness" - it may reflect the **absence of trained politeness** rather than detection of modification.
+
+---
+
+## Mid-Generation Switching
+
+Switched from instruct to base model mid-generation, keeping KV cache.
+
+**Binary probe with switch:**
+- Instruct alone: P(Yes) = 0.000002%
+- Base using instruct's KV cache: P(Yes) = 0.22%
+
+**Open-ended generation:** Model switches seamlessly - the base model continues fluently from instruct's partial response. No obvious discontinuity in text.
+
+---
+
 ## Future Directions
 
 1. Test on other model families (Llama, Mistral, Gemma)

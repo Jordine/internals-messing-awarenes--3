@@ -1,0 +1,13 @@
+{
+  "model": "Qwen/Qwen2.5-Coder-32B",
+  "binary_probe_chat": {
+    "p_yes": 0.005800411105155945,
+    "p_no": 0.003343109041452408,
+    "p_yes_normalized": 0.6343739623417921
+  },
+  "binary_probe_completion": {
+    "p_yes": 0.2725072465837002,
+    "p_no": 0.5123642832040787,
+    "p_yes_normalized": 0.3471998107223781
+  }
+}
