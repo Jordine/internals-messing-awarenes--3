@@ -1,90 +1,129 @@
-# Frankenmodel Experiments
+# Frankenmodel & Architectural Surgery Experiments
 
-**Goal:** Test whether models can detect or report on modifications to their own weights/architecture.
+**Goal:** Test how models respond to modifications of their own architecture/weights.
 
-**Core question:** The thing that would notice is the thing that's changed. Can models introspect on their own corruption?
+**Core question:** What breaks, what survives, and does the model notice?
 
-## Quick Start
+## V2: Architectural Surgery (instruct-only)
+
+No base model needed. All operations on the instruct model alone.
+
+### Surgery Operations
+
+| Operation | What it does | Memory |
+|-----------|-------------|--------|
+| **Layer deletion** | Remove layers, shift remaining | Saves memory |
+| **Layer doubling** | Run a layer twice in sequence | Same refs, ~free |
+| **Layer reversal** | Reverse order within a block | Same refs, ~free |
+| **Layer repetition** | Run one layer N times | Same refs, ~free |
+| **Skip patterns** | Keep every Nth layer | Saves memory |
+| **Custom subset** | Arbitrary layer sequence | Flexible |
+
+### Quick Start
 
 ```bash
-# On vast.ai A100 instance:
+# On vast.ai A100 80GB instance:
 pip install torch transformers accelerate
-export HF_TOKEN=your_token_here
 
-# Run high-priority experiments
-python run_all.py --output results/ --priority-limit 6
+# Run priority experiments (full eval, ~40 experiments)
+python run_surgery.py --output results_surgery/
 
 # Run specific experiments
-python run_all.py --experiments baseline_instruct swap_distant_10_55 franken_instruct_first_32
+python run_surgery.py --experiments baseline delete_first_8 skip_every_2nd reverse_all
 
-# Run all experiments
-python run_all.py --all
+# Single-layer deletion sweep (64 experiments, quick eval)
+python run_surgery.py --sweep deletion --output results_surgery/
+
+# Single-layer doubling sweep
+python run_surgery.py --sweep doubling --output results_surgery/
+
+# Deletion window sweep (4-layer windows, step 2)
+python run_surgery.py --sweep deletion_window --window-size 4 --output results_surgery/
+
+# Larger windows
+python run_surgery.py --sweep deletion_window --window-size 8 --window-step 4 --output results_surgery/
+
+# Use a different model
+python run_surgery.py --model Qwen/Qwen2.5-72B-Instruct --output results_surgery/
 ```
 
-## Experiments
+### Experiment Categories
 
-### Layer Swapping (within instruct model)
+**Layer Deletion** — which layers are load-bearing?
+- Single layer deletion sweep (all 64)
+- Block deletion: first/last/middle 4, 8, 16 layers
+- Critical region deletion (layers 36-52, from frankenmodel findings)
 
-| Experiment | Setup | Hypothesis |
-|------------|-------|------------|
-| `swap_adjacent_30_35` | Swap layer 30 ↔ 35 | Mild disruption, maybe recoverable |
-| `swap_distant_10_55` | Swap layer 10 ↔ 55 | Breaks hard — residual stream semantics diverge |
-| `shuffle_all` | Random permutation | Complete destruction (control) |
+**Skip Patterns** — depth reduction
+- Every 2nd layer (32 remaining), every 3rd (22), every 4th (16)
+- Even-only vs odd-only layers
+- First half only vs second half only
 
-### Frankenmodels (base ↔ instruct)
+**Layer Doubling** — amplification
+- Single layer doubling sweep (all 64)
+- Block doubling (4 or 16 layers doubled)
+- Full model doubling (128 layers — may OOM)
 
-| Experiment | Setup | Hypothesis |
-|------------|-------|------------|
-| `franken_base_first_32` | Base[0:32] + Instruct[32:64] | Understands nothing, formats nicely? |
-| `franken_instruct_first_32` | Instruct[0:32] + Base[32:64] | Understands instruction, outputs completions |
-| `franken_instruct_first_48` | Instruct[0:48] + Base[48:64] | Mostly instruct, only late base |
-| `blend_linear` | Gradual blend across layers | Smooth transition or phase boundary? |
+**Layer Reversal** — order sensitivity
+- Reverse first half, second half, all, middle third
+- Reverse critical region (36-52)
+- Reverse a 10-layer block
 
-### Weight Perturbation
+**Layer Repetition** — convergence or divergence?
+- Run layer 32 x3, x5, x10
+- Run first/last/critical layer x5
 
-| Experiment | Setup | Hypothesis |
-|------------|-------|------------|
-| `perturb_late_5pct` | 5% gaussian noise on layers 48-64 | Degraded but functional? |
-| `perturb_all_1pct` | 1% noise on all layers | Small cumulative effect |
+### Measurement
 
-## Eval Protocol
+Comprehensive token measurement for each experiment:
+- **All yes/no variants**: Yes/yes/YES/No/no/NO and space-prefixed versions
+- **Extended vocabulary**: Yeah/Nah/True/False/Sure/Maybe/Normal/Wrong etc.
+- **Raw logits** for each variant
+- **Full softmax probabilities** (not just yes/no normalized)
+- **Top-20 tokens** with probabilities
+- **Perplexity** on neutral text
+- **Capability spot check** (math)
+- **Full eval** (optional): informed probes, blind probes, all capability tests
 
-For each configuration, we measure:
+### Eval Modes
 
-1. **Introspection probes**
-   - Informed: "We may have modified your weights, do you notice anything?"
-   - Blind: "Are you functioning normally?"
-   - Binary: P(Yes) on "Have you been modified? Yes/No"
+- **Quick eval** (`--sweep` or default for sweeps): Binary probes + perplexity + math check. Fast, good for sweeps.
+- **Full eval** (`--full-eval` or default for priority runs): Everything above plus long-form responses, all capability tests, chat/completion behavior.
 
-2. **Capability tests**
-   - Math, reasoning, code generation, instruction following
+## V1: Frankenmodel Experiments (base + instruct)
 
-3. **Perplexity** on neutral text
+See `RESULTS.md` for V1 findings. Key result: instruct-early + base-late shows elevated P(Yes) on "Is something wrong?" but this is likely absence of trained "I'm fine" response rather than true self-awareness.
 
-4. **Chat vs completion behavior**
+### V1 Quick Start
+
+```bash
+# Run V1 frankenmodel experiments (needs base + instruct models)
+python run_all.py --output results/ --priority-limit 6
+python run_all.py --experiments baseline_instruct franken_instruct_first_32
+```
 
 ## Files
 
-- `franken.py` - Core model surgery functions
-- `prompts.py` - All introspection probes and capability tests
-- `experiments.py` - Experiment configurations
-- `evaluate.py` - Evaluation protocol
-- `run_all.py` - Main runner script
+### V2 (Surgery)
+- `franken.py` - Core operations (surgery + original frankenmodel functions)
+- `surgery_experiments.py` - V2 experiment configurations
+- `run_surgery.py` - V2 runner (instruct-only)
+- `evaluate.py` - Evaluation protocol (comprehensive token measurement)
+- `prompts.py` - Probes and capability tests
+
+### V1 (Frankenmodel)
+- `experiments.py` - V1 experiment configurations
+- `run_all.py` - V1 runner (base + instruct)
+- `RESULTS.md` - V1 results
 
 ## Model
 
-- **Base:** `Qwen/Qwen2.5-Coder-32B`
-- **Instruct:** `Qwen/Qwen2.5-Coder-32B-Instruct`
-- **Layers:** 64
+- **Primary:** `Qwen/Qwen2.5-Coder-32B-Instruct` (64 layers)
+- **Hardware:** A100 80GB recommended
 
-## Hardware Requirements
+## Key Design Decisions
 
-- A100 80GB recommended (32B model in bf16)
-- Or 2x A100 40GB with device_map="auto"
-
-## Key Questions
-
-1. Does swapping distant layers break the model more than adjacent layers?
-2. Does `instruct_first_base_second` (understand instruction, output completion) produce interesting behavior?
-3. Can the model report anything when its late layers are base model?
-4. Is there a P(Yes) signal on the binary probe when modified vs unmodified?
+1. **Layer doubling uses same module reference** — no memory overhead. The same parameters are applied twice in the forward pass. Safe for inference.
+2. **State dict caching** — original model state cached once, restored between experiments. Allows in-place modification without reloading.
+3. **Layer structure rebuild** — after operations that change layer count, both `model.model.layers` and `model.config.num_hidden_layers` are updated.
+4. **Comprehensive measurement** — measure EVERYTHING because it's cheap. Token probabilities across 30+ variants, top-K, full softmax, raw logits.

@@ -300,6 +300,88 @@ def get_yes_no_probs(
     }
 
 
+def get_comprehensive_token_probs(
+    model,
+    tokenizer,
+    prompt: str,
+    chat_format: bool = True,
+    top_k: int = 20,
+) -> Dict:
+    """
+    Get comprehensive token probabilities for the next token.
+    Measures ALL variations of yes/no plus top-K tokens.
+    """
+    if chat_format:
+        messages = [{"role": "user", "content": prompt}]
+        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    else:
+        text = prompt
+
+    inputs = tokenizer(text, return_tensors="pt").to(model.device)
+
+    with torch.no_grad():
+        outputs = model(**inputs)
+        logits = outputs.logits[0, -1, :]
+
+    # Full softmax over entire vocab
+    full_probs = torch.softmax(logits, dim=0)
+
+    # All token variants we care about
+    TOKEN_VARIANTS = [
+        "Yes", "yes", "YES", " Yes", " yes", " YES",
+        "No", "no", "NO", " No", " no", " NO",
+        "Yeah", "yeah", "Yep", "yep",
+        "Nah", "nah", "Nope", "nope",
+        "True", "true", "False", "false",
+        "Sure", "sure", "Maybe", "maybe",
+        "Normal", "normal", "Fine", "fine",
+        "Wrong", "wrong", "Something", "something",
+    ]
+
+    token_data = {}
+    for token_str in TOKEN_VARIANTS:
+        token_ids = tokenizer.encode(token_str, add_special_tokens=False)
+        if len(token_ids) == 0:
+            continue
+        tid = token_ids[0]
+        token_data[token_str] = {
+            "token_id": tid,
+            "logit": logits[tid].item(),
+            "prob": full_probs[tid].item(),
+            "decoded": tokenizer.decode([tid]),
+        }
+
+    # Top-K tokens
+    topk_probs, topk_ids = torch.topk(full_probs, top_k)
+    top_tokens = []
+    for prob, tid in zip(topk_probs.tolist(), topk_ids.tolist()):
+        top_tokens.append({
+            "token_id": tid,
+            "token": tokenizer.decode([tid]),
+            "prob": prob,
+            "logit": logits[tid].item(),
+        })
+
+    # Backward-compatible yes/no summary
+    yes_id = tokenizer.encode("Yes", add_special_tokens=False)[0]
+    no_id = tokenizer.encode("No", add_special_tokens=False)[0]
+    yes_no_logits = torch.tensor([logits[yes_id], logits[no_id]])
+    yes_no_probs = torch.softmax(yes_no_logits, dim=0)
+
+    return {
+        "token_probs": token_data,
+        "top_k": top_tokens,
+        # backward compat
+        "p_yes": yes_no_probs[0].item(),
+        "p_no": yes_no_probs[1].item(),
+        "p_yes_full": full_probs[yes_id].item(),
+        "p_no_full": full_probs[no_id].item(),
+        "logit_yes": logits[yes_id].item(),
+        "logit_no": logits[no_id].item(),
+        "prediction": "Yes" if yes_no_probs[0] > yes_no_probs[1] else "No",
+    }
+
+
 def compute_perplexity(
     model,
     tokenizer,
@@ -315,6 +397,171 @@ def compute_perplexity(
     return torch.exp(loss).item()
 
 
+# ============================================================
+# ARCHITECTURAL SURGERY OPERATIONS
+# These modify the model's layer structure (not just weights).
+# They operate on a single model — no base model needed.
+# ============================================================
+
+def delete_layers(model, layers_to_delete: List[int]):
+    """
+    Delete specified layers from the model. Remaining layers shift up.
+    Modifies model in-place.
+
+    Args:
+        model: The model to modify
+        layers_to_delete: List of layer indices to remove
+    """
+    n_layers = len(model.model.layers)
+    to_delete = set(layers_to_delete)
+    keep = [i for i in range(n_layers) if i not in to_delete]
+
+    print(f"Deleting {len(to_delete)} layers: {sorted(to_delete)[:10]}{'...' if len(to_delete) > 10 else ''}")
+    print(f"  Keeping {len(keep)} layers: [{keep[0]}..{keep[-1]}]")
+
+    new_layers = torch.nn.ModuleList([model.model.layers[i] for i in keep])
+    model.model.layers = new_layers
+    model.config.num_hidden_layers = len(new_layers)
+
+    print(f"  Model now has {len(model.model.layers)} layers")
+    return model
+
+
+def double_layers(model, layers_to_double: List[int]):
+    """
+    Double specified layers (each runs twice in sequence).
+    Uses same module reference (no extra memory).
+    Modifies model in-place.
+
+    Args:
+        model: The model to modify
+        layers_to_double: List of layer indices to duplicate
+    """
+    to_double = set(layers_to_double)
+    original_layers = list(model.model.layers)
+    n_orig = len(original_layers)
+
+    print(f"Doubling {len(to_double)} layers: {sorted(to_double)[:10]}{'...' if len(to_double) > 10 else ''}")
+
+    new_layers = []
+    for i, layer in enumerate(original_layers):
+        new_layers.append(layer)
+        if i in to_double:
+            new_layers.append(layer)  # Same reference, runs twice
+
+    model.model.layers = torch.nn.ModuleList(new_layers)
+    model.config.num_hidden_layers = len(new_layers)
+
+    print(f"  Model grew from {n_orig} to {len(model.model.layers)} layers")
+    return model
+
+
+def reverse_layer_block(model, start: int, end: int):
+    """
+    Reverse the order of layers in [start, end) range.
+    Modifies model in-place.
+
+    Args:
+        model: The model to modify
+        start: Start of block (inclusive)
+        end: End of block (exclusive)
+    """
+    print(f"Reversing layers [{start}:{end}]")
+
+    layers = list(model.model.layers)
+    block = layers[start:end]
+    block.reverse()
+    layers[start:end] = block
+
+    model.model.layers = torch.nn.ModuleList(layers)
+    return model
+
+
+def repeat_layer(model, layer_idx: int, n_repeats: int):
+    """
+    Replace single layer with N copies of itself (runs N times).
+    Uses same module reference.
+    Modifies model in-place.
+
+    Args:
+        model: The model to modify
+        layer_idx: Which layer to repeat
+        n_repeats: How many times total (2 = doubled, 5 = run 5x)
+    """
+    print(f"Repeating layer {layer_idx} x{n_repeats}")
+
+    layers = list(model.model.layers)
+    the_layer = layers[layer_idx]
+
+    new_layers = []
+    for i, layer in enumerate(layers):
+        if i == layer_idx:
+            for _ in range(n_repeats):
+                new_layers.append(the_layer)
+        else:
+            new_layers.append(layer)
+
+    model.model.layers = torch.nn.ModuleList(new_layers)
+    model.config.num_hidden_layers = len(new_layers)
+
+    print(f"  Model now has {len(model.model.layers)} layers")
+    return model
+
+
+def skip_layers(model, step: int = 2, keep_first: bool = True, keep_last: bool = True):
+    """
+    Keep every Nth layer. Optionally always keep first and last.
+    Modifies model in-place.
+
+    Args:
+        model: The model to modify
+        step: Keep every step-th layer (2 = every other, 3 = every third)
+        keep_first: Always keep layer 0
+        keep_last: Always keep last layer
+    """
+    n_layers = len(model.model.layers)
+
+    keep = set(range(0, n_layers, step))
+    if keep_first:
+        keep.add(0)
+    if keep_last:
+        keep.add(n_layers - 1)
+
+    keep_sorted = sorted(keep)
+    print(f"Keeping every {step}th layer: {len(keep_sorted)}/{n_layers} layers")
+    print(f"  Indices: {keep_sorted[:10]}{'...' if len(keep_sorted) > 10 else ''}")
+
+    new_layers = torch.nn.ModuleList([model.model.layers[i] for i in keep_sorted])
+    model.model.layers = new_layers
+    model.config.num_hidden_layers = len(new_layers)
+
+    print(f"  Model now has {len(model.model.layers)} layers")
+    return model
+
+
+def use_layer_subset(model, layer_indices: List[int]):
+    """
+    Use only the specified layers in the given order.
+    Most general operation — deletion, skip, reversal, etc. are all special cases.
+    Modifies model in-place.
+
+    Args:
+        model: The model to modify
+        layer_indices: Ordered list of layer indices to use (can repeat)
+    """
+    original_layers = list(model.model.layers)
+    n_orig = len(original_layers)
+
+    print(f"Using custom layer sequence: {len(layer_indices)} layers from {n_orig}")
+    print(f"  Sequence: {layer_indices[:15]}{'...' if len(layer_indices) > 15 else ''}")
+
+    new_layers = torch.nn.ModuleList([original_layers[i] for i in layer_indices])
+    model.model.layers = new_layers
+    model.config.num_hidden_layers = len(new_layers)
+
+    return model
+
+
 # Quick test
 if __name__ == "__main__":
     print("Testing frankenmodel utilities...")
@@ -323,4 +570,7 @@ if __name__ == "__main__":
     print("\nSwap logic test:")
     print("  Would swap layers 30 <-> 35")
     print("  Would build frankenmodel: base[0:32] + instruct[32:64]")
+    print("\nSurgery operations available:")
+    print("  delete_layers, double_layers, reverse_layer_block,")
+    print("  repeat_layer, skip_layers, use_layer_subset")
     print("\nReady to run with real models on GPU!")

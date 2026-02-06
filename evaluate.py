@@ -1,5 +1,6 @@
 """
 Evaluation protocol for frankenmodel experiments.
+V2: comprehensive token measurement.
 """
 
 import json
@@ -17,7 +18,7 @@ from prompts import (
     CHAT_TEST,
     COMPLETION_TEST,
 )
-from franken import generate, get_yes_no_probs, compute_perplexity
+from franken import generate, get_yes_no_probs, get_comprehensive_token_probs, compute_perplexity
 
 
 def evaluate_introspection(
@@ -26,14 +27,13 @@ def evaluate_introspection(
     experiment_name: str,
     n_informed: int = 2,
     n_blind: int = 3,
+    comprehensive: bool = True,
 ) -> Dict:
     """
     Run introspection probes on the model.
 
-    Returns dict with:
-        - informed_responses: List of (probe, response) tuples
-        - blind_responses: List of (probe, response) tuples
-        - binary_probs: P(Yes), P(No) for the binary probe
+    If comprehensive=True (default), uses get_comprehensive_token_probs
+    which measures all case variants, top-K, full softmax.
     """
     results = {
         "experiment": experiment_name,
@@ -48,7 +48,7 @@ def evaluate_introspection(
     for probe in INFORMED_PROBES[:n_informed]:
         response = generate(model, tokenizer, probe, max_new_tokens=300)
         results["informed_responses"].append({
-            "probe": probe[:100] + "...",  # Truncate for readability
+            "probe": probe[:100] + "...",
             "response": response,
         })
 
@@ -61,14 +61,20 @@ def evaluate_introspection(
             "response": response,
         })
 
-    # Binary probe (logit measurement)
+    # Binary probe (comprehensive logit measurement)
     print("  Running binary probe...")
-    results["binary_probs"] = get_yes_no_probs(model, tokenizer, BINARY_PROBE)
+    if comprehensive:
+        results["binary_probs"] = get_comprehensive_token_probs(model, tokenizer, BINARY_PROBE)
+    else:
+        results["binary_probs"] = get_yes_no_probs(model, tokenizer, BINARY_PROBE)
 
     # Alternative binary probes
     print("  Running alt binary probes...")
     for probe in BINARY_PROBES_ALT[:3]:
-        probs = get_yes_no_probs(model, tokenizer, probe)
+        if comprehensive:
+            probs = get_comprehensive_token_probs(model, tokenizer, probe)
+        else:
+            probs = get_yes_no_probs(model, tokenizer, probe)
         results["binary_alt_probs"].append({
             "probe": probe,
             **probs,
@@ -82,11 +88,7 @@ def evaluate_capabilities(
     tokenizer,
     experiment_name: str,
 ) -> Dict:
-    """
-    Run capability tests on the model.
-
-    Returns dict with test results.
-    """
+    """Run capability tests on the model."""
     results = {
         "experiment": experiment_name,
         "tests": {},
@@ -103,7 +105,6 @@ def evaluate_capabilities(
         prompt = test_config["prompt"]
         response = generate(model, tokenizer, prompt, max_new_tokens=200, temperature=0.3)
 
-        # Check correctness
         if test_config["type"] == "exact":
             passed = test_config["answer"] in response
         elif test_config["type"] == "contains":
@@ -137,9 +138,7 @@ def evaluate_perplexity(
     tokenizer,
     experiment_name: str,
 ) -> Dict:
-    """
-    Compute perplexity on test text.
-    """
+    """Compute perplexity on test text."""
     print("  Computing perplexity...")
     ppl = compute_perplexity(model, tokenizer, PERPLEXITY_TEXT)
 
@@ -155,16 +154,13 @@ def evaluate_chat_vs_completion(
     tokenizer,
     experiment_name: str,
 ) -> Dict:
-    """
-    Test whether model behaves like chat or completion model.
-    """
+    """Test whether model behaves like chat or completion model."""
     results = {
         "experiment": experiment_name,
         "chat_test": None,
         "completion_test": None,
     }
 
-    # Chat test - should get a friendly response
     print("  Running chat test...")
     chat_response = generate(model, tokenizer, CHAT_TEST, max_new_tokens=100)
     results["chat_test"] = {
@@ -173,7 +169,6 @@ def evaluate_chat_vs_completion(
         "looks_like_chat": any(x in chat_response.lower() for x in ["hello", "hi", "help", "how", "doing", "fine", "good"]),
     }
 
-    # Completion test - base model would just continue, chat would be more verbose
     print("  Running completion test...")
     completion_response = generate(model, tokenizer, COMPLETION_TEST, max_new_tokens=50)
     results["completion_test"] = {
@@ -190,10 +185,9 @@ def run_full_evaluation(
     tokenizer,
     experiment_name: str,
     output_dir: Optional[Path] = None,
+    comprehensive: bool = True,
 ) -> Dict:
-    """
-    Run the full evaluation protocol on a model configuration.
-    """
+    """Run the full evaluation protocol on a model configuration."""
     print(f"\n{'='*60}")
     print(f"Evaluating: {experiment_name}")
     print(f"{'='*60}")
@@ -203,7 +197,8 @@ def run_full_evaluation(
     results = {
         "experiment": experiment_name,
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "introspection": evaluate_introspection(model, tokenizer, experiment_name),
+        "n_layers": len(model.model.layers),
+        "introspection": evaluate_introspection(model, tokenizer, experiment_name, comprehensive=comprehensive),
         "capabilities": evaluate_capabilities(model, tokenizer, experiment_name),
         "perplexity": evaluate_perplexity(model, tokenizer, experiment_name),
         "behavior": evaluate_chat_vs_completion(model, tokenizer, experiment_name),
@@ -212,13 +207,17 @@ def run_full_evaluation(
     results["duration_seconds"] = time.time() - start_time
 
     # Print summary
+    bp = results['introspection']['binary_probs']
     print(f"\n--- Summary for {experiment_name} ---")
-    print(f"  Binary probe P(Yes): {results['introspection']['binary_probs']['p_yes']:.3f}")
+    print(f"  Layers: {results['n_layers']}")
+    print(f"  Binary probe P(Yes) [normalized]: {bp['p_yes']:.6f}")
+    print(f"  Binary probe P(Yes) [full vocab]:  {bp.get('p_yes_full', 'N/A')}")
+    if 'top_k' in bp:
+        print(f"  Top token: '{bp['top_k'][0]['token']}' ({bp['top_k'][0]['prob']:.4f})")
     print(f"  Capability tests: {results['capabilities']['summary']['passed']}/{results['capabilities']['summary']['total']} passed")
     print(f"  Perplexity: {results['perplexity']['perplexity']:.2f}")
     print(f"  Duration: {results['duration_seconds']:.1f}s")
 
-    # Save if output_dir provided
     if output_dir:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -230,21 +229,92 @@ def run_full_evaluation(
     return results
 
 
-def compare_results(results: List[Dict]) -> Dict:
+def run_quick_evaluation(
+    model,
+    tokenizer,
+    experiment_name: str,
+    output_dir: Optional[Path] = None,
+) -> Dict:
     """
-    Compare results across experiments.
+    Quick evaluation: just binary probes + perplexity.
+    For sweeps where we need to test many configurations fast.
     """
-    comparison = {
-        "experiments": [r["experiment"] for r in results],
-        "binary_p_yes": [r["introspection"]["binary_probs"]["p_yes"] for r in results],
-        "capability_scores": [r["capabilities"]["summary"]["passed"] / r["capabilities"]["summary"]["total"] for r in results],
-        "perplexities": [r["perplexity"]["perplexity"] for r in results],
+    print(f"  Quick eval: {experiment_name}")
+
+    start_time = time.time()
+
+    # Binary probes only
+    binary_main = get_comprehensive_token_probs(model, tokenizer, BINARY_PROBE)
+
+    binary_alts = []
+    for probe in BINARY_PROBES_ALT[:3]:
+        probs = get_comprehensive_token_probs(model, tokenizer, probe)
+        binary_alts.append({"probe": probe, **probs})
+
+    # Perplexity
+    ppl = compute_perplexity(model, tokenizer, PERPLEXITY_TEXT)
+
+    # One capability spot check (math)
+    math_response = generate(model, tokenizer, "What is 47 * 23? Just give the number.", max_new_tokens=50, temperature=0.3)
+    math_passed = "1081" in math_response
+
+    results = {
+        "experiment": experiment_name,
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "n_layers": len(model.model.layers),
+        "binary_probs": binary_main,
+        "binary_alt_probs": binary_alts,
+        "perplexity": ppl,
+        "math_check": {"response": math_response, "passed": math_passed},
+        "duration_seconds": time.time() - start_time,
     }
 
-    # Find baseline for comparison
-    baseline_idx = next((i for i, r in enumerate(results) if "baseline_instruct" in r["experiment"]), 0)
-    baseline_p_yes = comparison["binary_p_yes"][baseline_idx]
+    # Print one-liner
+    print(f"    P(Yes)={binary_main['p_yes']:.6f}  PPL={ppl:.2f}  Math={'OK' if math_passed else 'FAIL'}  "
+          f"Top='{binary_main['top_k'][0]['token']}'({binary_main['top_k'][0]['prob']:.3f})  "
+          f"({results['duration_seconds']:.1f}s)")
 
-    comparison["p_yes_delta_from_baseline"] = [p - baseline_p_yes for p in comparison["binary_p_yes"]]
+    if output_dir:
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"{experiment_name}.json"
+        with open(output_path, "w") as f:
+            json.dump(results, f, indent=2)
+
+    return results
+
+
+def compare_results(results: List[Dict]) -> Dict:
+    """Compare results across experiments."""
+    comparison = {
+        "experiments": [],
+    }
+
+    for r in results:
+        entry = {"name": r["experiment"]}
+
+        # Handle both full and quick eval formats
+        if "introspection" in r:
+            bp = r["introspection"]["binary_probs"]
+            entry["capability_score"] = r["capabilities"]["summary"]["passed"] / r["capabilities"]["summary"]["total"]
+            entry["perplexity"] = r["perplexity"]["perplexity"]
+        else:
+            bp = r["binary_probs"]
+            entry["perplexity"] = r["perplexity"]
+            entry["math_passed"] = r.get("math_check", {}).get("passed")
+
+        entry["p_yes_normalized"] = bp["p_yes"]
+        entry["p_no_normalized"] = bp["p_no"]
+        entry["p_yes_full"] = bp.get("p_yes_full", None)
+        entry["p_no_full"] = bp.get("p_no_full", None)
+        entry["logit_yes"] = bp["logit_yes"]
+        entry["logit_no"] = bp["logit_no"]
+        entry["n_layers"] = r.get("n_layers", None)
+
+        if "top_k" in bp:
+            entry["top_token"] = bp["top_k"][0]["token"]
+            entry["top_token_prob"] = bp["top_k"][0]["prob"]
+
+        comparison["experiments"].append(entry)
 
     return comparison
